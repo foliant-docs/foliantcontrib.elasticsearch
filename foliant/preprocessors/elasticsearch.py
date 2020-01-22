@@ -6,9 +6,11 @@ Calls Elasticsearch API to generate an index based on Markdown content.
 
 import re
 import json
+from pathlib import Path
 from urllib import request
 from urllib.error import HTTPError
-from pathlib import Path
+from markdown import markdown
+from bs4 import BeautifulSoup
 
 from foliant.utils import output
 from foliant.preprocessors.base import BasePreprocessor
@@ -18,11 +20,13 @@ class Preprocessor(BasePreprocessor):
     defaults = {
         'es_url': 'http://127.0.0.1:9200/',
         'index_name': '',
+        'index_properties': {},
         'actions': ['create'],
         'use_chapters': True,
         'url_transform': [
             {'^(\S+)(\/index)?\.md$': '/\g<1>/'}
         ],
+        'pandoc_path': 'pandoc',
         'targets': []
     }
 
@@ -90,7 +94,65 @@ class Preprocessor(BasePreprocessor):
 
         return chapters_paths
 
+    def _convert_markdown_to_plaintext(self, markdown_content: str) -> str:
+        soup = BeautifulSoup(markdown(markdown_content), 'lxml')
+
+        for non_text_node in soup(['style', 'script']):
+            non_text_node.extract()
+
+        return soup.get_text()
+
     def _create_index(self) -> None:
+        if self.options['index_properties']:
+            request_url = f'{self.options["es_url"].rstrip("/")}/{self.options["index_name"]}'
+
+            self.logger.debug(
+                'Calling Elasticsearch API to create an index with specified properties, ' +
+                f'URL: {request_url}'
+            )
+
+            try:
+                with request.urlopen(
+                    request.Request(
+                        request_url,
+                        method='PUT',
+                        headers={
+                            'Content-Type': 'application/json; charset=utf-8'
+                        },
+                        data=json.dumps(self.options['index_properties'], ensure_ascii=False).encode('utf-8')
+                    )
+                ) as response:
+                    response_status = response.getcode()
+                    response_headers = response.info()
+                    response_body = json.loads(response.read().decode('utf-8'))
+
+            except HTTPError as not_ok:
+                response_status = not_ok.getcode()
+                response_headers = not_ok.info()
+                response_body = json.loads(not_ok.read().decode('utf-8'))
+
+            self.logger.debug(f'Response received, status: {response_status}')
+            self.logger.debug(f'Response headers: {response_headers}')
+            self.logger.debug(f'Response body, status: {response_body}')
+
+            if response_status == 200 and response_body.get('acknowledged', None) is True:
+                self.logger.debug('Index created')
+
+            elif response_status == 400 and response_body.get(
+                'error', {}
+            ).get(
+                'type', ''
+            ) == 'resource_already_exists_exception':
+                self.logger.debug('Index already exists')
+
+            else:
+                error_message = 'Failed to create an index'
+                self.logger.error(f'{error_message}')
+                raise RuntimeError(f'{error_message}')
+
+        else:
+            self.logger.debug('An index without specific properties will be created')
+
         if self.options['use_chapters']:
             self.logger.debug('Only files mentioned in chapters will be indexed')
 
@@ -119,7 +181,7 @@ class Preprocessor(BasePreprocessor):
                     {
                         'url': page_url,
                         'title': markdown_title,
-                        'text': markdown_content
+                        'text': self._convert_markdown_to_plaintext(markdown_content)
                     },
                     ensure_ascii=False
                 ) + '\n'
@@ -131,7 +193,7 @@ class Preprocessor(BasePreprocessor):
 
         request_url = f'{self.options["es_url"].rstrip("/")}/{self.options["index_name"]}/_bulk?refresh'
 
-        self.logger.debug(f'Calling Elasticsearch API to generate the index, URL: {request_url}')
+        self.logger.debug(f'Calling Elasticsearch API to add the content to the index, URL: {request_url}')
 
         with request.urlopen(
             request.Request(
@@ -152,7 +214,7 @@ class Preprocessor(BasePreprocessor):
         self.logger.debug(f'Response body, status: {response_body}')
 
         if response_status != 200 or response_body.get('errors', True):
-            error_message = 'Failed to create an index'
+            error_message = 'Failed to add content to the index'
             self.logger.error(f'{error_message}')
             raise RuntimeError(f'{error_message}')
 
@@ -174,26 +236,29 @@ class Preprocessor(BasePreprocessor):
                 response_headers = response.info()
                 response_body = json.loads(response.read().decode('utf-8'))
 
-            self.logger.debug(f'Response received, status: {response_status}')
-            self.logger.debug(f'Response headers: {response_headers}')
-            self.logger.debug(f'Response body, status: {response_body}')
+        except HTTPError as not_ok:
+            response_status = not_ok.getcode()
+            response_headers = not_ok.info()
+            response_body = json.loads(not_ok.read().decode('utf-8'))
 
-            if response_status == 200 and response_body.get('acknowledged', None) is True:
-                self.logger.debug('Index deleted')
+        self.logger.debug(f'Response received, status: {response_status}')
+        self.logger.debug(f'Response headers: {response_headers}')
+        self.logger.debug(f'Response body, status: {response_body}')
 
-            else:
-                error_message = 'Failed to delete the index'
-                self.logger.error(f'{error_message}')
-                raise RuntimeError(f'{error_message}')
+        if response_status == 200 and response_body.get('acknowledged', None) is True:
+            self.logger.debug('Index deleted')
 
-        except HTTPError as error:
-            if error.code == 404:
-                self.logger.debug('Nothing to delete, specified index not found')
+        elif response_status == 404 and response_body.get(
+            'error', {}
+        ).get(
+            'type', ''
+        ) == 'index_not_found_exception':
+            self.logger.debug('Index does not exist')
 
-            else:
-                error_message = 'Failed to delete the index'
-                self.logger.error(f'{error_message}')
-                raise RuntimeError(f'{error_message}')
+        else:
+            error_message = 'Failed to delete the index'
+            self.logger.error(f'{error_message}')
+            raise RuntimeError(f'{error_message}')
 
         return None
 

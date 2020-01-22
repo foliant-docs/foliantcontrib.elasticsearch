@@ -25,7 +25,9 @@ setup(
     platforms='any',
     install_requires=[
         'foliant>=1.0.4',
-        'requests'
+        'markdown',
+        'bs4',
+        'lxml'
     ],
     classifiers=[
         "Development Status :: 5 - Production/Stable",
