@@ -12,7 +12,6 @@ from urllib.error import HTTPError
 from markdown import markdown
 from bs4 import BeautifulSoup
 
-from foliant.utils import output
 from foliant.preprocessors.base import BasePreprocessor
 
 
@@ -26,7 +25,6 @@ class Preprocessor(BasePreprocessor):
         'url_transform': [
             {'^(\S+)(\/index)?\.md$': '/\g<1>/'}
         ],
-        'pandoc_path': 'pandoc',
         'targets': []
     }
 
@@ -102,43 +100,66 @@ class Preprocessor(BasePreprocessor):
 
         return soup.get_text()
 
+    def _http_request(
+        self,
+        request_url: str,
+        request_method: str = 'GET',
+        request_headers: dict or None = None,
+        request_data: bytes or None = None
+    ) -> dict:
+        http_request = request.Request(request_url, method=request_method)
+
+        if request_headers:
+            http_request.headers = request_headers
+
+        if request_data:
+            http_request.data = request_data
+
+        try:
+            with request.urlopen(http_request) as http_response:
+                response_status = http_response.getcode()
+                response_headers = http_response.info()
+                response_data = http_response.read()
+
+        except HTTPError as http_response_not_ok:
+            response_status = http_response_not_ok.getcode()
+            response_headers = http_response_not_ok.info()
+            response_data = http_response_not_ok.read()
+
+        return {
+            'status': response_status,
+            'headers': response_headers,
+            'data': response_data
+        }
+
     def _create_index(self) -> None:
         if self.options['index_properties']:
-            request_url = f'{self.options["es_url"].rstrip("/")}/{self.options["index_name"]}'
+            create_request_url = f'{self.options["es_url"].rstrip("/")}/{self.options["index_name"]}'
 
             self.logger.debug(
                 'Calling Elasticsearch API to create an index with specified properties, ' +
-                f'URL: {request_url}'
+                f'URL: {create_request_url}'
             )
 
-            try:
-                with request.urlopen(
-                    request.Request(
-                        request_url,
-                        method='PUT',
-                        headers={
-                            'Content-Type': 'application/json; charset=utf-8'
-                        },
-                        data=json.dumps(self.options['index_properties'], ensure_ascii=False).encode('utf-8')
-                    )
-                ) as response:
-                    response_status = response.getcode()
-                    response_headers = response.info()
-                    response_body = json.loads(response.read().decode('utf-8'))
+            create_response = self._http_request(
+                create_request_url,
+                'PUT',
+                {
+                    'Content-Type': 'application/json; charset=utf-8'
+                },
+                json.dumps(self.options['index_properties'], ensure_ascii=False).encode('utf-8')
+            )
 
-            except HTTPError as not_ok:
-                response_status = not_ok.getcode()
-                response_headers = not_ok.info()
-                response_body = json.loads(not_ok.read().decode('utf-8'))
+            create_response_data = json.loads(create_response['data'].decode('utf-8'))
 
-            self.logger.debug(f'Response received, status: {response_status}')
-            self.logger.debug(f'Response headers: {response_headers}')
-            self.logger.debug(f'Response body, status: {response_body}')
+            self.logger.debug(f'Response received, status: {create_response["status"]}')
+            self.logger.debug(f'Response headers: {create_response["headers"]}')
+            self.logger.debug(f'Response data: {create_response_data}')
 
-            if response_status == 200 and response_body.get('acknowledged', None) is True:
+            if create_response['status'] == 200 and create_response_data.get('acknowledged', None) is True:
                 self.logger.debug('Index created')
 
-            elif response_status == 400 and response_body.get(
+            elif create_response['status'] == 400 and create_response_data.get(
                 'error', {}
             ).get(
                 'type', ''
@@ -191,29 +212,26 @@ class Preprocessor(BasePreprocessor):
 
         self.logger.debug(f'Data for indexing: {data_for_indexing}')
 
-        request_url = f'{self.options["es_url"].rstrip("/")}/{self.options["index_name"]}/_bulk?refresh'
+        update_request_url = f'{self.options["es_url"].rstrip("/")}/{self.options["index_name"]}/_bulk?refresh'
 
-        self.logger.debug(f'Calling Elasticsearch API to add the content to the index, URL: {request_url}')
+        self.logger.debug(f'Calling Elasticsearch API to add the content to the index, URL: {update_request_url}')
 
-        with request.urlopen(
-            request.Request(
-                request_url,
-                method='POST',
-                headers={
-                    'Content-Type': 'application/json; charset=utf-8'
-                },
-                data=data_for_indexing.encode('utf-8')
-            )
-        ) as response:
-            response_status = response.getcode()
-            response_headers = response.info()
-            response_body = json.loads(response.read().decode('utf-8'))
+        update_response = self._http_request(
+            update_request_url,
+            'POST',
+            {
+                'Content-Type': 'application/json; charset=utf-8'
+            },
+            data_for_indexing.encode('utf-8')
+        )
 
-        self.logger.debug(f'Response received, status: {response_status}')
-        self.logger.debug(f'Response headers: {response_headers}')
-        self.logger.debug(f'Response body, status: {response_body}')
+        update_response_data = json.loads(update_response['data'].decode('utf-8'))
 
-        if response_status != 200 or response_body.get('errors', True):
+        self.logger.debug(f'Response received, status: {update_response["status"]}')
+        self.logger.debug(f'Response headers: {update_response["headers"]}')
+        self.logger.debug(f'Response data: {update_response_data}')
+
+        if update_response['status'] != 200 or update_response_data.get('errors', True):
             error_message = 'Failed to add content to the index'
             self.logger.error(f'{error_message}')
             raise RuntimeError(f'{error_message}')
@@ -221,34 +239,25 @@ class Preprocessor(BasePreprocessor):
         return None
 
     def _delete_index(self) -> None:
-        request_url = f'{self.options["es_url"].rstrip("/")}/{self.options["index_name"]}/'
+        delete_request_url = f'{self.options["es_url"].rstrip("/")}/{self.options["index_name"]}/'
 
-        self.logger.debug(f'Calling Elasticsearch API to delete the index, URL: {request_url}')
+        self.logger.debug(f'Calling Elasticsearch API to delete the index, URL: {delete_request_url}')
 
-        try:
-            with request.urlopen(
-                request.Request(
-                    request_url,
-                    method='DELETE',
-                )
-            ) as response:
-                response_status = response.getcode()
-                response_headers = response.info()
-                response_body = json.loads(response.read().decode('utf-8'))
+        delete_response = self._http_request(
+            delete_request_url,
+            'DELETE'
+        )
 
-        except HTTPError as not_ok:
-            response_status = not_ok.getcode()
-            response_headers = not_ok.info()
-            response_body = json.loads(not_ok.read().decode('utf-8'))
+        delete_response_data = json.loads(delete_response['data'].decode('utf-8'))
 
-        self.logger.debug(f'Response received, status: {response_status}')
-        self.logger.debug(f'Response headers: {response_headers}')
-        self.logger.debug(f'Response body, status: {response_body}')
+        self.logger.debug(f'Response received, status: {delete_response["status"]}')
+        self.logger.debug(f'Response headers: {delete_response["headers"]}')
+        self.logger.debug(f'Response data: {delete_response_data}')
 
-        if response_status == 200 and response_body.get('acknowledged', None) is True:
+        if delete_response['status'] == 200 and delete_response_data.get('acknowledged', None) is True:
             self.logger.debug('Index deleted')
 
-        elif response_status == 404 and response_body.get(
+        elif delete_response['status'] == 404 and delete_response_data.get(
             'error', {}
         ).get(
             'type', ''
