@@ -131,6 +131,6 @@ The [simple client-side Web application example](https://github.com/foliant-docs
 
 Search results may look like that:
 
-![Search Results](foliant_elasticsearch.png)
+![Search Results](https://raw.githubusercontent.com/foliant-docs/foliantcontrib.elasticsearch/develop/foliant_elasticsearch.png)
 
 If you use self-hosted instance of Elasticsearch, you may need to configure it to append [CORS](https://developer.mozilla.org/en-US/docs/Web/HTTP/CORS) headers to HTTP API responses.
