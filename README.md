@@ -37,8 +37,9 @@ preprocessors:
             - create
         use_chapters: true
         url_transform:
-            - '^(\S+)(\/index)?\.md$': '/\g<1>/'
-        ]
+            - '\/?index\.md$': '/'
+            - '\.md$': '/'
+            - '^([^\/]+)': '/\g<1>'
         targets: []
 ```
 
@@ -58,7 +59,7 @@ preprocessors:
 :   If set to `true`, the preprocessor applies only to the files that are mentioned in the `chapters` section of the project config. Otherwise, the preprocessor applies to all of the files of the project.
 
 `url_transform`
-:   List of rules to transform local paths of source Markdown files into URLs of target pages. Each rule should be a dictionary. Its data is passed to the [`re.sub()` method](https://docs.python.org/3/library/re.html#re.sub): key as the `pattern` argument, and value as the `repl` argument. The local path to the source Markdown file relative to the temporary working directory is passed as the `string` argument. The default value of the `url_transform` option is designed to be used to build static websites with MkDocs backend.
+:   Sequence of rules to transform local paths of source Markdown files into URLs of target pages. Each rule should be a dictionary. Its data is passed to the [`re.sub()` method](https://docs.python.org/3/library/re.html#re.sub): key as the `pattern` argument, and value as the `repl` argument. The local path (possibly previously transformed) to the source Markdown file relative to the temporary working directory is passed as the `string` argument. The default value of the `url_transform` option is designed to be used to build static websites with MkDocs backend.
 
 `targets`
 :   Allowed targets for the preprocessor. If not specified (by default), the preprocessor applies to all targets.
@@ -131,3 +132,5 @@ The [simple client-side Web application example](https://github.com/foliant-docs
 Search results may look like that:
 
 ![Search Results](foliant_elasticsearch.png)
+
+If you use self-hosted instance of Elasticsearch, you may need to configure it to append [CORS](https://developer.mozilla.org/en-US/docs/Web/HTTP/CORS) headers to HTTP API responses.

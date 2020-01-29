@@ -23,7 +23,9 @@ class Preprocessor(BasePreprocessor):
         'actions': ['create'],
         'use_chapters': True,
         'url_transform': [
-            {'^(\S+)(\/index)?\.md$': '/\g<1>/'}
+            {'\/?index\.md$': '/'},
+            {'\.md$': '/'},
+            {'^([^\/]+)': '/\g<1>'}
         ],
         'targets': []
     }
