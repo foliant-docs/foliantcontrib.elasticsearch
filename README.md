@@ -37,6 +37,7 @@ preprocessors:
             - delete
             - create
         use_chapters: true
+        format: plaintext
         escape_html: true
         url_transform:
             - '\/?index\.md$': '/'
@@ -60,8 +61,11 @@ preprocessors:
 `use_chapters`
 :   If set to `true` (by default), the preprocessor applies only to the files that are mentioned in the `chapters` section of the project config. Otherwise, the preprocessor applies to all of the files of the project.
 
+`format`:
+:   Format that the source Markdown content should be converted to before adding to the index; available values are: `plaintext` (by default), `html`, `markdown` (for no conversion).
+
 `escape_html`
-:   If set to `true` (by default), HTML syntax constructions in the text will be escaped by converting `&` to `&amp;`, `<` to `&lt;`, `>` to `&gt;`, and `"` to `&quot;`.
+:   If set to `true` (by default), HTML syntax constructions in the content converted to `plaintext` will be escaped by replacing `&` with `&amp;`, `<` with `&lt;`, `>` with `&gt;`, and `"` with `&quot;`.
 
 `url_transform`
 :   Sequence of rules to transform local paths of source Markdown files into URLs of target pages. Each rule should be a dictionary. Its data is passed to the [`re.sub()` method](https://docs.python.org/3/library/re.html#re.sub): key as the `pattern` argument, and value as the `repl` argument. The local path (possibly previously transformed) to the source Markdown file relative to the temporary working directory is passed as the `string` argument. The default value of the `url_transform` option is designed to be used to build static websites with MkDocs backend.
@@ -75,7 +79,7 @@ The preprocessor reads each source Markdown file and generates three fields for 
 
 * `url`—target page URL;
 * `title`—document title, it’s taken from the first heading of source Markdown content;
-* `text`—source Markdown content converted into plain text.
+* `content`—source Markdown content, optionally converted into plain text or HTML.
 
 When all the files are processed, the preprocessor calls Elasticsearch API to create the index.
 
@@ -122,12 +126,12 @@ The [simple client-side Web application example](https://github.com/foliant-docs
         "multi_match": {
             "query": "foliant",
             "type": "phrase_prefix",
-            "fields": [ "title^3", "text" ]
+            "fields": [ "title^3", "content" ]
         }
     },
     "highlight": {
         "fields": {
-            "text": {}
+            "content": {}
         }
     },
     "size": 50

@@ -11,12 +11,12 @@ function performSearch(textToSearch) {
             "multi_match": {
                 "query": textToSearch,
                 "type": "phrase_prefix",
-                "fields": [ "title^3", "text" ]
+                "fields": [ "title^3", "content" ]
             }
         },
         "highlight": {
             "fields": {
-                "text": {}
+                "content": {}
             }
         },
         "size": 50
@@ -37,8 +37,8 @@ function performSearch(textToSearch) {
         for(let i = 0; i < response.hits.hits.length; i++) {
             output += '<h2>' + response.hits.hits[i]._source.title + '</h2><p>Page URL: <a href="' + baseUrl + response.hits.hits[i]._source.url + '">' + baseUrl + response.hits.hits[i]._source.url + '</a></p><pre>';
 
-            for(let j = 0; j < response.hits.hits[i].highlight.text.length; j++) {
-                output += response.hits.hits[i].highlight.text[j] + '\n\n';
+            for(let j = 0; j < response.hits.hits[i].highlight.content.length; j++) {
+                output += response.hits.hits[i].highlight.content[j] + '\n\n';
             }
 
             output += '</pre>';

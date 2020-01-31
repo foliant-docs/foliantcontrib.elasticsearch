@@ -25,6 +25,7 @@ class Preprocessor(BasePreprocessor):
             'create'
         ],
         'use_chapters': True,
+        'format': 'plaintext',
         'escape_html': True,
         'url_transform': [
             {'\/?index\.md$': '/'},
@@ -97,14 +98,6 @@ class Preprocessor(BasePreprocessor):
         self.logger.debug(f'Chapters files paths: {chapters_paths}')
 
         return chapters_paths
-
-    def _convert_markdown_to_plaintext(self, markdown_content: str) -> str:
-        soup = BeautifulSoup(markdown(markdown_content), 'lxml')
-
-        for non_text_node in soup(['style', 'script']):
-            non_text_node.extract()
-
-        return soup.get_text()
 
     def _http_request(
         self,
@@ -204,15 +197,32 @@ class Preprocessor(BasePreprocessor):
             if markdown_content:
                 url = self._get_url(markdown_file_path)
                 title = self._get_title(markdown_content)
-                text = self._convert_markdown_to_plaintext(markdown_content)
 
-                if self.options['escape_html']:
-                    self.logger.debug('HTML syntax will be escaped')
+                if self.options['format'] == 'html' or self.options['format'] == 'plaintext':
+                    self.logger.debug(f'Converting source Markdown content to: {self.options["format"]}')
 
-                    if title:
-                        title = self._escape_html(title)
+                    content = markdown(markdown_content)
 
-                    text = self._escape_html(text)
+                    if self.options['format'] == 'plaintext':
+                        soup = BeautifulSoup(content, 'lxml')
+
+                        for non_text_node in soup(['style', 'script']):
+                            non_text_node.extract()
+
+                        content = soup.get_text()
+
+                        if self.options['escape_html']:
+                            self.logger.debug('Escaping HTML syntax')
+
+                            if title:
+                                title = self._escape_html(title)
+
+                            content = self._escape_html(content)
+
+                else:
+                    self.logger.debug('Leaving source Markdown content unchanged')
+
+                    content = markdown_content
 
                 self.logger.debug(f'Adding the page, URL: {url}, title: {title}')
 
@@ -220,7 +230,7 @@ class Preprocessor(BasePreprocessor):
                     {
                         'url': url,
                         'title': title,
-                        'text': text
+                        'content': content
                     },
                     ensure_ascii=False
                 ) + '\n'
