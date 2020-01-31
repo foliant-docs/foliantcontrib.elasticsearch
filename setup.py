@@ -1,7 +1,7 @@
 from setuptools import setup
 
 
-SHORT_DESCRIPTION = 'Elasticsearch integration preprocessor for Foliant.'
+SHORT_DESCRIPTION = 'Elasticsearch integration extension for Foliant.'
 
 try:
     with open('README.md', encoding='utf8') as readme:
@@ -16,7 +16,7 @@ setup(
     description=SHORT_DESCRIPTION,
     long_description=LONG_DESCRIPTION,
     long_description_content_type='text/markdown',
-    version='1.0.0',
+    version='1.0.1',
     author='Artemy Lomov',
     author_email='artemy@lomov.ru',
     url='https://github.com/foliant-docs/foliantcontrib.elasticsearch',
