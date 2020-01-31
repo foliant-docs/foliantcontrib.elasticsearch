@@ -61,7 +61,7 @@ preprocessors:
 `use_chapters`
 :   If set to `true` (by default), the preprocessor applies only to the files that are mentioned in the `chapters` section of the project config. Otherwise, the preprocessor applies to all of the files of the project.
 
-`format`:
+`format`
 :   Format that the source Markdown content should be converted to before adding to the index; available values are: `plaintext` (by default), `html`, `markdown` (for no conversion).
 
 `escape_html`
