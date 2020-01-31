@@ -1,4 +1,4 @@
-# Elasticsearch Preprocessor
+# Elasticsearch Extension
 
 This extension allows to integrate Foliant-managed documentation projects with [Elasticsearch](https://www.elastic.co/guide/en/elasticsearch/reference/current/elasticsearch-intro.html) search engine.
 
