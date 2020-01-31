@@ -34,8 +34,10 @@ preprocessors:
         index_name: ''
         index_properties: {}
         actions:
+            - delete
             - create
         use_chapters: true
+        escape_html: true
         url_transform:
             - '\/?index\.md$': '/'
             - '\.md$': '/'
@@ -47,16 +49,19 @@ preprocessors:
 :   Elasticsearch API URL.
 
 `index_name`
-:   Name of the index. Your index must have an explicitly specified name, otherwise API URL will be invalid.
+:   Name of the index. Your index must have an explicitly specified name, otherwise (by default) API URL will be invalid.
 
 `index_properties`
-:   Settings and other properties that should be used when creating an index. If not specified, the default settings will be used. More details are described below.
+:   Settings and other properties that should be used when creating an index. If not specified (by default), the default Elasticsearch settings will be used. More details are described below.
 
 `actions`
-:   List of actions that the preprocessor should to perform. Available values are: `delete`, `create`. Often it is needed to remove and then fully rebuild the index.
+:   List of actions that the preprocessor should to perform. Available item values are: `delete`, `create`. By default, both of them are used since in most cases it’s needed to remove and then fully rebuild the index.
 
 `use_chapters`
-:   If set to `true`, the preprocessor applies only to the files that are mentioned in the `chapters` section of the project config. Otherwise, the preprocessor applies to all of the files of the project.
+:   If set to `true` (by default), the preprocessor applies only to the files that are mentioned in the `chapters` section of the project config. Otherwise, the preprocessor applies to all of the files of the project.
+
+`escape_html`
+:   If set to `true` (by default), HTML syntax constructions in the text will be escaped by converting `&` to `&amp;`, `<` to `&lt;`, `>` to `&gt;`, and `"` to `&quot;`.
 
 `url_transform`
 :   Sequence of rules to transform local paths of source Markdown files into URLs of target pages. Each rule should be a dictionary. Its data is passed to the [`re.sub()` method](https://docs.python.org/3/library/re.html#re.sub): key as the `pattern` argument, and value as the `repl` argument. The local path (possibly previously transformed) to the source Markdown file relative to the temporary working directory is passed as the `string` argument. The default value of the `url_transform` option is designed to be used to build static websites with MkDocs backend.
@@ -69,7 +74,7 @@ preprocessors:
 The preprocessor reads each source Markdown file and generates three fields for indexing:
 
 * `url`—target page URL;
-* `title`—document title, it is taken from the first heading of source Markdown content;
+* `title`—document title, it’s taken from the first heading of source Markdown content;
 * `text`—source Markdown content converted into plain text.
 
 When all the files are processed, the preprocessor calls Elasticsearch API to create the index.

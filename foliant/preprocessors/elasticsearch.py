@@ -20,8 +20,12 @@ class Preprocessor(BasePreprocessor):
         'es_url': 'http://127.0.0.1:9200/',
         'index_name': '',
         'index_properties': {},
-        'actions': ['create'],
+        'actions': [
+            'delete',
+            'create'
+        ],
         'use_chapters': True,
+        'escape_html': True,
         'url_transform': [
             {'\/?index\.md$': '/'},
             {'\.md$': '/'},
@@ -37,7 +41,7 @@ class Preprocessor(BasePreprocessor):
 
         self.logger.debug(f'Preprocessor inited: {self.__dict__}')
 
-    def _get_page_url(self, markdown_file_path: str) -> str:
+    def _get_url(self, markdown_file_path: str) -> str:
         url = str(markdown_file_path.relative_to(self.working_dir))
         url_transformation_rules = self.options['url_transform']
 
@@ -50,7 +54,7 @@ class Preprocessor(BasePreprocessor):
 
         return url
 
-    def _get_markdown_title(self, markdown_content: str) -> str or None:
+    def _get_title(self, markdown_content: str) -> str or None:
         headings_found = re.search(
             r'^\#{1,6}\s+(.+?)(?:\s+\{\#\S+\})?\s*$',
             markdown_content,
@@ -134,6 +138,9 @@ class Preprocessor(BasePreprocessor):
             'data': response_data
         }
 
+    def _escape_html(self, content: str) -> str:
+        return content.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;').replace('"', '&quot;')
+
     def _create_index(self) -> None:
         if self.options['index_properties']:
             create_request_url = f'{self.options["es_url"].rstrip("/")}/{self.options["index_name"]}'
@@ -195,16 +202,25 @@ class Preprocessor(BasePreprocessor):
                 markdown_content = markdown_file.read()
 
             if markdown_content:
-                page_url = self._get_page_url(markdown_file_path)
-                markdown_title = self._get_markdown_title(markdown_content)
+                url = self._get_url(markdown_file_path)
+                title = self._get_title(markdown_content)
+                text = self._convert_markdown_to_plaintext(markdown_content)
 
-                self.logger.debug(f'Adding the page, URL: {page_url}, title: {markdown_title}')
+                if self.options['escape_html']:
+                    self.logger.debug('HTML syntax will be escaped')
+
+                    if title:
+                        title = self._escape_html(title)
+
+                    text = self._escape_html(text)
+
+                self.logger.debug(f'Adding the page, URL: {url}, title: {title}')
 
                 data_for_indexing += '{"index": {}}\n' + json.dumps(
                     {
-                        'url': page_url,
-                        'title': markdown_title,
-                        'text': self._convert_markdown_to_plaintext(markdown_content)
+                        'url': url,
+                        'title': title,
+                        'text': text
                     },
                     ensure_ascii=False
                 ) + '\n'

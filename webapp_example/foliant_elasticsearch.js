@@ -38,7 +38,7 @@ function performSearch(textToSearch) {
             output += '<h2>' + response.hits.hits[i]._source.title + '</h2><p>Page URL: <a href="' + baseUrl + response.hits.hits[i]._source.url + '">' + baseUrl + response.hits.hits[i]._source.url + '</a></p><pre>';
 
             for(let j = 0; j < response.hits.hits[i].highlight.text.length; j++) {
-                output += '<p>' + response.hits.hits[i].highlight.text[j] + '</p>';
+                output += response.hits.hits[i].highlight.text[j] + '\n\n';
             }
 
             output += '</pre>';
