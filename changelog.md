@@ -1,3 +1,7 @@
+# 1.0.3
+
+-   Add `require_env` option.
+
 # 1.0.2
 
 -   Add `format` option. Use `escape_html` only for `format: plaintext`.

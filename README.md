@@ -43,6 +43,7 @@ preprocessors:
             - '\/?index\.md$': '/'
             - '\.md$': '/'
             - '^([^\/]+)': '/\g<1>'
+        require_env: false
         targets: []
 ```
 
@@ -69,6 +70,9 @@ preprocessors:
 
 `url_transform`
 :   Sequence of rules to transform local paths of source Markdown files into URLs of target pages. Each rule should be a dictionary. Its data is passed to the [`re.sub()` method](https://docs.python.org/3/library/re.html#re.sub): key as the `pattern` argument, and value as the `repl` argument. The local path (possibly previously transformed) to the source Markdown file relative to the temporary working directory is passed as the `string` argument. The default value of the `url_transform` option is designed to be used to build static websites with MkDocs backend.
+
+`require_env`
+:   If set to `true`, the `FOLIANT_ELASTICSEARCH` environment variable must be set to allow the preprocessor to perform any operations with Elasticsearch index. This flag may be useful in CI/CD jobs.
 
 `targets`
 :   Allowed targets for the preprocessor. If not specified (by default), the preprocessor applies to all targets.

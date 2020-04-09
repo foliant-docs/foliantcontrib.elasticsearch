@@ -6,6 +6,7 @@ Calls Elasticsearch API to generate an index based on Markdown content.
 
 import re
 import json
+from os import getenv
 from pathlib import Path
 from urllib import request
 from urllib.error import HTTPError
@@ -32,6 +33,7 @@ class Preprocessor(BasePreprocessor):
             {'\.md$': '/'},
             {'^([^\/]+)': '/\g<1>'}
         ],
+        'require_env': False,
         'targets': []
     }
 
@@ -302,27 +304,33 @@ class Preprocessor(BasePreprocessor):
     def apply(self):
         self.logger.info('Applying preprocessor')
 
-        self.logger.debug(
-            f'Allowed targets: {self.options["targets"]}, ' +
-            f'current target: {self.context["target"]}'
-        )
+        envvar = 'FOLIANT_ELASTICSEARCH'
 
-        if not self.options['targets'] or self.context['target'] in self.options['targets']:
-            actions = self.options['actions']
+        if not self.options['require_env'] or getenv(envvar) is not None:
+            self.logger.debug(
+                f'Allowed targets: {self.options["targets"]}, ' +
+                f'current target: {self.context["target"]}'
+            )
 
-            if not isinstance(self.options['actions'], list):
-                actions = [actions]
+            if not self.options['targets'] or self.context['target'] in self.options['targets']:
+                actions = self.options['actions']
 
-            for action in actions:
-                self.logger.debug(f'Applying action: {action}')
+                if not isinstance(self.options['actions'], list):
+                    actions = [actions]
 
-                if action == 'create':
-                    self._create_index()
+                for action in actions:
+                    self.logger.debug(f'Applying action: {action}')
 
-                elif action == 'delete':
-                    self._delete_index()
+                    if action == 'create':
+                        self._create_index()
 
-                else:
-                    self.logger.debug('Unknown action, skipping')
+                    elif action == 'delete':
+                        self._delete_index()
+
+                    else:
+                        self.logger.debug('Unknown action, skipping')
+
+        else:
+            self.logger.debug(f'Environment variable {envvar} is not set, skipping')
 
         self.logger.info('Preprocessor applied')
