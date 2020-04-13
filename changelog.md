@@ -1,3 +1,7 @@
+# 1.0.4
+
+-   Add `copy` action.
+
 # 1.0.3
 
 -   Add `require_env` option.

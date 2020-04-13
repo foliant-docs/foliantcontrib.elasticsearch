@@ -20,6 +20,7 @@ class Preprocessor(BasePreprocessor):
     defaults = {
         'es_url': 'http://127.0.0.1:9200/',
         'index_name': '',
+        'index_copy_name': '',
         'index_properties': {},
         'actions': [
             'delete',
@@ -136,9 +137,9 @@ class Preprocessor(BasePreprocessor):
     def _escape_html(self, content: str) -> str:
         return content.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;').replace('"', '&quot;')
 
-    def _create_index(self) -> None:
+    def _create_index(self, index_name: str) -> None:
         if self.options['index_properties']:
-            create_request_url = f'{self.options["es_url"].rstrip("/")}/{self.options["index_name"]}'
+            create_request_url = f'{self.options["es_url"].rstrip("/")}/{index_name}/'
 
             self.logger.debug(
                 'Calling Elasticsearch API to create an index with specified properties, ' +
@@ -242,7 +243,7 @@ class Preprocessor(BasePreprocessor):
 
         self.logger.debug(f'Data for indexing: {data_for_indexing}')
 
-        update_request_url = f'{self.options["es_url"].rstrip("/")}/{self.options["index_name"]}/_bulk?refresh'
+        update_request_url = f'{self.options["es_url"].rstrip("/")}/{index_name}/_bulk?refresh'
 
         self.logger.debug(f'Calling Elasticsearch API to add the content to the index, URL: {update_request_url}')
 
@@ -268,8 +269,8 @@ class Preprocessor(BasePreprocessor):
 
         return None
 
-    def _delete_index(self) -> None:
-        delete_request_url = f'{self.options["es_url"].rstrip("/")}/{self.options["index_name"]}/'
+    def _delete_index(self, index_name: str) -> None:
+        delete_request_url = f'{self.options["es_url"].rstrip("/")}/{index_name}/'
 
         self.logger.debug(f'Calling Elasticsearch API to delete the index, URL: {delete_request_url}')
 
@@ -301,6 +302,114 @@ class Preprocessor(BasePreprocessor):
 
         return None
 
+    def _update_index_setting(self, index_name: str, settings_to_update: dict) -> None:
+        update_request_url = f'{self.options["es_url"].rstrip("/")}/{index_name}/_settings/'
+
+        self.logger.debug(f'Calling Elasticsearch API to update the index settings, URL: {update_request_url}')
+
+        update_response = self._http_request(
+            update_request_url,
+            'PUT',
+            {
+                'Content-Type': 'application/json; charset=utf-8'
+            },
+            json.dumps(
+                settings_to_update,
+                ensure_ascii=False
+            ).encode('utf-8')
+        )
+
+        update_response_data = json.loads(update_response['data'].decode('utf-8'))
+
+        self.logger.debug(f'Response received, status: {update_response["status"]}')
+        self.logger.debug(f'Response headers: {update_response["headers"]}')
+        self.logger.debug(f'Response data: {update_response_data}')
+
+        if update_response['status'] == 200 and update_response_data.get('acknowledged', None) is True:
+            self.logger.debug('Index settings updated')
+
+        else:
+            error_message = 'Failed to update the index settings'
+            self.logger.error(f'{error_message}')
+            raise RuntimeError(f'{error_message}')
+
+        return None
+
+    def _clone_index(self, index_name: str, index_copy_name: str) -> None:
+        clone_request_url = f'{self.options["es_url"].rstrip("/")}/{index_name}/_clone/{index_copy_name}/'
+
+        self.logger.debug(f'Calling Elasticsearch API to clone the index, URL: {clone_request_url}')
+
+        clone_response = self._http_request(
+            clone_request_url,
+            'POST'
+        )
+
+        clone_response_data = json.loads(clone_response['data'].decode('utf-8'))
+
+        self.logger.debug(f'Response received, status: {clone_response["status"]}')
+        self.logger.debug(f'Response headers: {clone_response["headers"]}')
+        self.logger.debug(f'Response data: {clone_response_data}')
+
+        if clone_response['status'] == 200 and clone_response_data.get('acknowledged', None) is True:
+            self.logger.debug('Index cloned')
+
+        else:
+            error_message = 'Failed to clone the index'
+            self.logger.error(f'{error_message}')
+            raise RuntimeError(f'{error_message}')
+
+        return None
+
+    def _copy_index(self, index_name: str, index_copy_name: str) -> None:
+        if not index_copy_name:
+            index_copy_name = index_name + '_copy'
+
+        self.logger.debug(f'Copying the index {index_name} to {index_copy_name}')
+
+        self.logger.debug(f'First, marking the index {index_name} as read-only')
+
+        self._update_index_setting(
+            index_name,
+            {
+                'settings': {
+                    'index.blocks.write': True
+                }
+            }
+        )
+
+        self.logger.debug(f'Second, deleting the index {index_copy_name}, if exists')
+
+        self._delete_index(index_copy_name)
+
+        self.logger.debug(f'Third, cloning the index {index_name} as {index_copy_name}')
+
+        self._clone_index(index_name, index_copy_name)
+
+        self.logger.debug(f'Fourth, unmarking the index {index_name} as read-only')
+
+        self._update_index_setting(
+            index_name,
+            {
+                'settings': {
+                    'index.blocks.write': False
+                }
+            }
+        )
+
+        self.logger.debug(f'Fifth, also unmarking the index {index_copy_name} as read-only')
+
+        self._update_index_setting(
+            index_copy_name,
+            {
+                'settings': {
+                    'index.blocks.write': False
+                }
+            }
+        )
+
+        return None
+
     def apply(self):
         self.logger.info('Applying preprocessor')
 
@@ -322,10 +431,13 @@ class Preprocessor(BasePreprocessor):
                     self.logger.debug(f'Applying action: {action}')
 
                     if action == 'create':
-                        self._create_index()
+                        self._create_index(self.options['index_name'])
 
                     elif action == 'delete':
-                        self._delete_index()
+                        self._delete_index(self.options['index_name'])
+
+                    elif action == 'copy':
+                        self._copy_index(self.options['index_name'], self.options['index_copy_name'])
 
                     else:
                         self.logger.debug('Unknown action, skipping')

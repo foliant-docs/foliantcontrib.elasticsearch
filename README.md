@@ -32,6 +32,7 @@ preprocessors:
     - elasticsearch:
         es_url: 'http://127.0.0.1:9200/'
         index_name: ''
+        index_copy_name: ''
         index_properties: {}
         actions:
             - delete
@@ -53,11 +54,20 @@ preprocessors:
 `index_name`
 :   Name of the index. Your index must have an explicitly specified name, otherwise (by default) API URL will be invalid.
 
+`index_copy_name`
+:   Name of the index copy when the `copy` action is used; see below. If the `index_copy_name` is not set explicitly, and if the `index_name` is specified, the `index_copy_name` value will be formed as the `index_name` value with the `_copy` string appended to the end.
+
 `index_properties`
 :   Settings and other properties that should be used when creating an index. If not specified (by default), the default Elasticsearch settings will be used. More details are described below.
 
 `actions`
-:   List of actions that the preprocessor should to perform. Available item values are: `delete`, `create`. By default, both of them are used since in most cases it’s needed to remove and then fully rebuild the index.
+:   Sequence of actions that the preprocessor should to perform. Available item values are: `delete`, `create`, `copy`. By default, the actions `delete` and `create` are performed since in most cases it’s needed to remove and then fully rebuild the index. The `copy` action is used to duplicate an index, i.e to create a copy of the index `index_name` with the name `index_copy_name`. This action may be useful when a common search index is created for multiple Foliant projects, and the index may remain incomplete during for a long time during their building. The `copy` action is not atomic. To perform it, the preprocessor:
+
+    * marks the source index `index_name` as read-only;
+    * deletes the target index `index_copy_name` if it exists;
+    * clones the source index `index_name` and thereby creates the target index `index_copy_name`;
+    * unmarks the source index `index_name` as read-only;
+    * also unmarks the target index `index_copy_name` as read-only, since the target index inherits the settings of the source one.
 
 `use_chapters`
 :   If set to `true` (by default), the preprocessor applies only to the files that are mentioned in the `chapters` section of the project config. Otherwise, the preprocessor applies to all of the files of the project.
